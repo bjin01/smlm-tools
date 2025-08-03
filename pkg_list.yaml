@@ -1,0 +1,14 @@
+add_packages:
+  asdfasdf:
+    version: 3006.0
+    release: 150000.3.78.1
+    source_channel: sle-manager-tools15-updates-x86_64-sap-sp6
+    target_channels:
+      - sles15sp6-test-sle-manager-tools15-updates-x86_64-sap-sp6
+
+  venv-salt-minion:
+    version: 3006.0
+    release: 150000.3.78.1
+    source_channel: sle-manager-tools15-updates-x86_64-sap-sp6
+    target_channels:
+      - sles15sp6-test-sle-manager-tools15-updates-x86_64-sap-sp6
