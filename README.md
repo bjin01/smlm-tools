@@ -1,0 +1,81 @@
+# SMLM Tools
+SUSE Multi-Linux Manager (SMLM) tools for managing packages and channels.
+This tool is still under development and may not support all features yet.
+
+At the moment, it supports adding packages to channels and listing packages in a specific channel.
+
+Motivation:
+Although SMLM provides content lifecycle management to clone channels and filter packages sometimes it is necessary to add single packages to channels without the need to build and promote a complete channel.
+This tool allows you to do that by specifying the packages in a YAML configuration file.
+
+# Tested with:
+- SMLM 5.1
+- OS: SLE-Micro 6.1
+
+# Features
+- Add packages to channels based on a YAML configuration file.
+- List packages in a specific channel. Use this feature to find details about packages in a channel, such as version, release, architecture, but also verify if a package is already in the channel.
+
+# Installation
+To install the tool, clone the repository and run:
+```bash
+go build -o smlm_tool main.go
+```
+# Prerequisites
+- Go 1.24 or later
+- Required Go packages:
+  - `github.com/spf13/cobra`
+  - `gopkg.in/yaml.v3`  
+
+# Usage
+Run the tool with the following command:
+```bash
+smlm_tool <command> [options]
+```
+# Commands
+- `add_packages --config <pkg_list.yaml>`: Add packages to channels based on the configuration in the YAML file.
+- `list_packages --channel <channel_label>`: List packages in a specific channel.
+
+# Example
+To add packages from a YAML configuration file:
+```bash
+smlm_tool add_packages --config pkg_list.yaml
+```
+To list packages in a specific channel:
+```bash
+smlm_tool list_packages --channel <channel_label>
+```
+# Configuration
+The configuration for adding packages is specified in a YAML file. The file should contain the following structure:
+```yaml
+packages:
+  <package_name>:
+    version: <package_version>
+    release: <package_release>
+    source_channel: <source_channel_label>
+    target_channels: 
+      - <target_channel_label>
+      - <another_target_channel_label>
+
+  <another_package_name>:
+    version: <another_package_version>
+    release: <another_package_release>
+    source_channel: <another_source_channel_label>
+    target_channels: 
+      - <another_target_channel_label>
+      - <yet_another_target_channel_label>
+```
+# Output example:
+```bash
+smlm_tool add_packages --config=pkg_list.yaml
+2025/08/03 14:50:20 addPackagesCmd_config pkg_list.yaml
+Connecting to SUSE Manager at mysuma1.susedemo.de:443 with user apiuser
+Processing package: asdfasdf
+2025/08/03 14:50:21 Package not found: asdfasdf in channel sle-manager-tools15-updates-x86_64-sap-sp6 with version 3006.0 and release 150000.3.78.1
+Processing package: venv-salt-minion
+Found package: venv-salt-minion (ID: 34634) in channel sle-manager-tools15-updates-x86_64-sap-sp6
+Adding package: venv-salt-minion (IDs: [34634]) to target channel sles15sp6-test-sle-manager-tools15-updates-x86_64-sap-sp6
+Successfully added packages to channel sles15sp6-test-sle-manager-tools15-updates-x86_64-sap-sp6
+Successfully logged out from SUSE Manager
+```
+```bash
