@@ -265,6 +265,9 @@ func main() {
 			log.Fatalf("YAML file does not exist: %s", yamlFile)
 		}
 		if _, err := os.Stat(yamlFile); err != nil {
+			if os.IsPermission(err) {
+				log.Fatalf("Permission denied accessing YAML file: %s. Please check file permissions.", yamlFile)
+			}
 			log.Fatalf("Error accessing YAML file: %v", err)
 		}
 		if yamlFile == "" {

@@ -45,6 +45,22 @@ To list packages in a specific channel:
 ```bash
 smlm_tool list_packages --channel <channel_label>
 ```
+# Run from container
+The environment_file should contain the necessary environment variables to connect to your SUSE Manager instance, such as:
+```bash
+SUSE_MANAGER_URL=https://mysuma1.susedemo.de:443
+SUSE_MANAGER_PORT=443
+SUSE_MANAGER_USER=apiuser
+SUSE_MANAGER_PASSWORD=apiuserpassword
+```
+```bash
+podman run -it \
+--env-file "$PWD"/environment_file \
+-v "$PWD"/pkg_list.yaml:/pkg_list.yaml:Z \
+smlm-tools /usr/local/bin/smlm_tool \
+add_packages --config /pkg_list.yaml
+```
+
 # Configuration
 The configuration for adding packages is specified in a YAML file. The file should contain the following structure:
 ```yaml
