@@ -4,9 +4,9 @@ This tool is still under development and may not support all features yet.
 
 At the moment, it supports adding packages to channels and listing packages in a specific channel.
 
-Motivation:
-Although SMLM provides content lifecycle management to clone channels and filter packages sometimes it is necessary to add single packages to channels without the need to build and promote a complete channel.
-This tool allows you to do that by specifying the packages in a YAML configuration file.
+__Motivation__:
+Although SMLM provides content-lifecycle-management to clone channels and filter packages sometimes it is necessary to add single package to channels without the need to build and promote a complete channel. Especially re-build and promote many channels in large environments can take a lot of time and resources.
+This tool allows you to do add packages by specifying the packages in a YAML configuration file.
 
 # Tested with:
 - SMLM 5.1
@@ -15,6 +15,10 @@ This tool allows you to do that by specifying the packages in a YAML configurati
 # Features
 - Add packages to channels based on a YAML configuration file.
 - List packages in a specific channel. Use this feature to find details about packages in a channel, such as version, release, architecture, but also verify if a package is already in the channel.
+- if a package is already in the target channel, it will not be added again.
+- If a package is not found in the source channel, it will be logged, and the process will continue with the next package.
+- same package can be added to multiple target channels.
+- same package with different versions can be added to the same target channel, a new package definition in yaml is required for each version.
 
 # Installation
 To install the tool, clone the repository and run:
@@ -32,7 +36,7 @@ Run the tool with the following command:
 ```bash
 smlm_tool <command> [options]
 ```
-# Commands
+# Sub-Commands
 - `add_packages --config <pkg_list.yaml>`: Add packages to channels based on the configuration in the YAML file.
 - `list_packages --channel <channel_label>`: List packages in a specific channel.
 
@@ -45,7 +49,17 @@ To list packages in a specific channel:
 ```bash
 smlm_tool list_packages --channel <channel_label>
 ```
-# Run from container
+# Run smlm-tool using container
+
+You can run the tool using a containerized environment with Podman or Docker. The container image is built from the source code and includes all necessary dependencies.
+
+# Build the container image
+```bash
+git clone https://github.com/bjin01/smlm-tools.git
+cd smlm-tools
+podman build -t smlm-tools .
+```
+
 The environment_file should contain the necessary environment variables to connect to your SUSE Manager instance, such as:
 ```bash
 SUSE_MANAGER_URL=https://mysuma1.susedemo.de:443
