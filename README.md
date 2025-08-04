@@ -64,22 +64,21 @@ add_packages --config /pkg_list.yaml
 # Configuration
 The configuration for adding packages is specified in a YAML file. The file should contain the following structure:
 ```yaml
-packages:
-  <package_name>:
-    version: <package_version>
-    release: <package_release>
-    source_channel: <source_channel_label>
-    target_channels: 
-      - <target_channel_label>
-      - <another_target_channel_label>
+- <package_name>
+  version: <package_version>
+  release: <package_release>
+  source_channel: <source_channel_label>
+  target_channels: 
+    - <target_channel_label>
+    - <another_target_channel_label>
 
-  <another_package_name>:
-    version: <another_package_version>
-    release: <another_package_release>
-    source_channel: <another_source_channel_label>
-    target_channels: 
-      - <another_target_channel_label>
-      - <yet_another_target_channel_label>
+- <another_package_name>
+  version: <another_package_version>
+  release: <another_package_release>
+  source_channel: <another_source_channel_label>
+  target_channels: 
+    - <another_target_channel_label>
+    - <yet_another_target_channel_label>
 ```
 # Output example:
 ```bash

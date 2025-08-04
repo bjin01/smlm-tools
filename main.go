@@ -20,12 +20,11 @@ type Config struct {
 }
 
 type AddPackagesConfig struct {
-	AddPackages map[string]struct {
-		Version        string   `yaml:"version"`
-		Release        string   `yaml:"release"`
-		SourceChannel  string   `yaml:"source_channel"`
-		TargetChannels []string `yaml:"target_channels"`
-	} `yaml:"add_packages"`
+	Name           string   `yaml:"name"`
+	Version        string   `yaml:"version"`
+	Release        string   `yaml:"release"`
+	SourceChannel  string   `yaml:"source_channel"`
+	TargetChannels []string `yaml:"target_channels"`
 }
 
 type Package struct {
@@ -35,6 +34,12 @@ type Package struct {
 	Epoch     string `xmlrpc:"epoch"`
 	ID        int    `xmlrpc:"id"`
 	ArchLabel string `xmlrpc:"arch_label"`
+}
+
+type Pkg_ProvidingChannels struct {
+	Label       string `xmlrpc:"label"`
+	ParentLabel string `xmlrpc:"parent_label"`
+	Name        string `xmlrpc:"name"`
 }
 
 func NewConfigFromEnv() *Config {
@@ -103,9 +108,10 @@ func addPackageToChannel(client *xmlrpc.Client, sessionKey string, pkgIDs []int,
 	return nil
 }
 
-func listPackagesInChannel(client *xmlrpc.Client, sessionKey, channelLabel string) ([]Package, error) {
+func listPackagesInChannel(client *xmlrpc.Client, sessionKey string, channelLabel string) ([]Package, error) {
 	var packages []Package
-	err := client.Call("channel.software.listLatestPackages", []interface{}{sessionKey, channelLabel}, &packages)
+	//err := client.Call("channel.software.listLatestPackages", []interface{}{sessionKey, channelLabel}, &packages)
+	err := client.Call("channel.software.listAllPackages", []interface{}{sessionKey, channelLabel}, &packages)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list packages in channel %s: %v", channelLabel, err)
 	}
@@ -116,6 +122,15 @@ func listPackagesInChannel(client *xmlrpc.Client, sessionKey, channelLabel strin
 	return packages, nil
 }
 
+func listProvidingChannels(client *xmlrpc.Client, sessionKey string, packageID int) ([]Pkg_ProvidingChannels, error) {
+	var pkg_channels []Pkg_ProvidingChannels
+	err := client.Call("packages.listProvidingChannels", []interface{}{sessionKey, packageID}, &pkg_channels)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list providing channels for package %d: %v", packageID, err)
+	}
+	return pkg_channels, nil
+}
+
 func handleAddPackages(config *Config, yamlFile string) {
 	file, err := os.Open(yamlFile)
 	if err != nil {
@@ -124,7 +139,7 @@ func handleAddPackages(config *Config, yamlFile string) {
 	defer file.Close()
 
 	decoder := yaml.NewDecoder(file)
-	var addPackagesConfig AddPackagesConfig
+	var addPackagesConfig []AddPackagesConfig
 	if err := decoder.Decode(&addPackagesConfig); err != nil {
 		log.Fatalf("failed to decode yaml file: %v", err)
 	}
@@ -143,10 +158,10 @@ func handleAddPackages(config *Config, yamlFile string) {
 	}
 	defer logoutFromSMLM(client, sessionKey)
 
-	for pkgName, cfg := range addPackagesConfig.AddPackages {
-		fmt.Printf("Processing package: %s\n", pkgName)
+	for _, cfg := range addPackagesConfig {
+		fmt.Printf("Processing package: %s\n", cfg.Name)
 		if cfg.SourceChannel == "" || len(cfg.TargetChannels) == 0 {
-			log.Printf("\033[31mSkipping package %s: source channel or target channels not specified\033[0m", pkgName)
+			log.Printf("\033[31mSkipping package %s: source channel or target channels not specified\033[0m", cfg.Name)
 			continue
 		}
 		sourcePackages, err := listPackagesInChannel(client, sessionKey, cfg.SourceChannel)
@@ -157,23 +172,48 @@ func handleAddPackages(config *Config, yamlFile string) {
 
 		var pkgIDs []int
 		for _, pkg := range sourcePackages {
-			if pkg.Name == pkgName && pkg.Version == cfg.Version && pkg.Release == cfg.Release {
-				fmt.Printf("\033[32mFound package:\033[0m %s (ID: %d) in channel %s\n", pkgName, pkg.ID, cfg.SourceChannel)
-				pkgIDs = append(pkgIDs, pkg.ID)
+			if pkg.Name == cfg.Name && pkg.Version == cfg.Version && pkg.Release == cfg.Release {
+				fmt.Printf("\n\033[32mFound package:\033[0m %s (ID: %d) in channel %s\n", cfg.Name, pkg.ID, cfg.SourceChannel)
+				found_pkgs, err := listProvidingChannels(client, sessionKey, pkg.ID)
+				if err != nil {
+					log.Printf("\033[31mFailed to list providing channels for package %d: %v\033[0m", pkg.ID, err)
+					continue
+				}
+				if len(found_pkgs) == 0 {
+					log.Printf("\033[33mNo providing channels found for package %s (ID: %d)\033[0m", pkg.Name, pkg.ID)
+				} else {
+					for _, targetChannel := range cfg.TargetChannels {
+						pkg_already_in_target := false
+						for _, channel := range found_pkgs {
+							//fmt.Printf("\033[34mPackage %s (ID: %d) is provided by channel: %s\033[0m\n", pkg.Name, pkg.ID, channel.Label)
+							if channel.Label == targetChannel {
+								pkg_already_in_target = true
+								fmt.Printf("\033[32mPackage %s (ID: %d) is already in target channel %s\033[0m\n", pkg.Name, pkg.ID, targetChannel)
+							}
+						}
+
+						if !pkg_already_in_target {
+							pkgIDs = append(pkgIDs, pkg.ID)
+							//fmt.Printf("\033[32mAdding package ID %d to the list for target channels\033[0m\n", pkg.ID)
+							if len(pkgIDs) > 0 {
+								fmt.Printf("\033[34mAdding package:\033[0m %s (IDs: %v) to target channel %s\n", cfg.Name, pkgIDs, targetChannel)
+								if err := addPackageToChannel(client, sessionKey, pkgIDs, targetChannel); err != nil {
+									log.Printf("\033[31mFailed to add package:\033[0m %s to channel %s: %v", cfg.Name, targetChannel, err)
+								}
+							}
+						} else {
+							log.Printf("\033[33mPackage %s (ID: %d) is already in target channel %s, skipping...\033[0m", pkg.Name, pkg.ID, targetChannel)
+						}
+					}
+				}
+
 			}
 		}
 
-		if len(pkgIDs) == 0 {
-			log.Printf("\033[31mPackage not found:\033[0m %s in channel %s with version %s and release %s", pkgName, cfg.SourceChannel, cfg.Version, cfg.Release)
+		/* if len(pkgIDs) == 0 {
+			log.Printf("\033[31mPackage not found:\033[0m %s in channel %s with version %s and release %s", cfg.Name, cfg.SourceChannel, cfg.Version, cfg.Release)
 			continue
-		}
-
-		for _, targetChannel := range cfg.TargetChannels {
-			fmt.Printf("\033[34mAdding package:\033[0m %s (IDs: %v) to target channel %s\n", pkgName, pkgIDs, targetChannel)
-			if err := addPackageToChannel(client, sessionKey, pkgIDs, targetChannel); err != nil {
-				log.Printf("\033[31mFailed to add package:\033[0m %s to channel %s: %v", pkgName, targetChannel, err)
-			}
-		}
+		} */
 	}
 }
 
