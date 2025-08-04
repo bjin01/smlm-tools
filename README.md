@@ -4,6 +4,9 @@ This tool is still under development and may not support all features yet.
 
 At the moment, it supports adding packages to channels and listing packages in a specific channel.
 
+Screenshot:
+![smlm_tool](Screenshot-smlm-tools.jpg)
+
 __Motivation__:
 Although SMLM provides content-lifecycle-management to clone channels and filter packages sometimes it is necessary to add single package to channels without the need to build and promote a complete channel. Especially re-build and promote many channels in large environments can take a lot of time and resources.
 This tool allows you to do add packages by specifying the packages in a YAML configuration file.
