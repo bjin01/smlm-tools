@@ -2,6 +2,7 @@
   version: 3006.0
   release: 150000.3.75.5
   source_channel: sle-manager-tools15-updates-x86_64-sap-sp6
+  newest: true
   target_channels:
     - sles15sp6-test-sle-manager-tools15-updates-x86_64-sap-sp6
     - sles15sp6-prod-sle-manager-tools15-updates-x86_64-sap-sp6

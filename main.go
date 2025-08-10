@@ -25,6 +25,7 @@ type AddPackagesConfig struct {
 	Release        string   `yaml:"release"`
 	SourceChannel  string   `yaml:"source_channel"`
 	TargetChannels []string `yaml:"target_channels"`
+	Newest         bool     `yaml:"newest"`
 }
 
 type Package struct {
@@ -108,12 +109,21 @@ func addPackageToChannel(client *xmlrpc.Client, sessionKey string, pkgIDs []int,
 	return nil
 }
 
-func listPackagesInChannel(client *xmlrpc.Client, sessionKey string, channelLabel string) ([]Package, error) {
+func listPackagesInChannel(client *xmlrpc.Client, sessionKey string, channelLabel string, newest AddPackagesConfig) ([]Package, error) {
 	var packages []Package
+	method := ""
+	if newest.Newest {
+		method = "channel.software.listLatestPackages"
+		fmt.Printf("Listing latest packages in channel: %s\n", channelLabel)
+	} else {
+		method = "channel.software.listAllPackages"
+		fmt.Printf("Listing all packages in channel: %s\n", channelLabel)
+	}
 	//err := client.Call("channel.software.listLatestPackages", []interface{}{sessionKey, channelLabel}, &packages)
-	err := client.Call("channel.software.listAllPackages", []interface{}{sessionKey, channelLabel}, &packages)
+
+	err := client.Call(method, []interface{}{sessionKey, channelLabel}, &packages)
 	if err != nil {
-		return nil, fmt.Errorf("failed to list packages in channel %s: %v", channelLabel, err)
+		return nil, fmt.Errorf("failed to get packages in channel %s: %v", channelLabel, err)
 	}
 
 	if len(packages) == 0 {
@@ -159,12 +169,12 @@ func handleAddPackages(config *Config, yamlFile string) {
 	defer logoutFromSMLM(client, sessionKey)
 
 	for _, cfg := range addPackagesConfig {
-		fmt.Printf("Processing package: %s\n", cfg.Name)
+		fmt.Printf("\nProcessing package: %s\n", cfg.Name)
 		if cfg.SourceChannel == "" || len(cfg.TargetChannels) == 0 {
 			log.Printf("\033[31mSkipping package %s: source channel or target channels not specified\033[0m", cfg.Name)
 			continue
 		}
-		sourcePackages, err := listPackagesInChannel(client, sessionKey, cfg.SourceChannel)
+		sourcePackages, err := listPackagesInChannel(client, sessionKey, cfg.SourceChannel, cfg)
 		if err != nil {
 			log.Printf("\033[31mFailed to list packages in source channel %s: %v\033[0m", cfg.SourceChannel, err)
 			continue
@@ -172,9 +182,22 @@ func handleAddPackages(config *Config, yamlFile string) {
 
 		var pkgIDs []int
 		for _, pkg := range sourcePackages {
-			if pkg.Name == cfg.Name && pkg.Version == cfg.Version && pkg.Release == cfg.Release {
-				fmt.Printf("\n\033[32mFound package:\033[0m %s (ID: %d) in channel %s\n", cfg.Name, pkg.ID, cfg.SourceChannel)
-				found_pkgs, err := listProvidingChannels(client, sessionKey, pkg.ID)
+			seek_pkg_id := 0
+			if cfg.Newest {
+				if pkg.Name == cfg.Name {
+					fmt.Printf("\033[32mFound latest package:\033[0m %s (ID: %d) in channel %s\n", cfg.Name, pkg.ID, cfg.SourceChannel)
+					seek_pkg_id = pkg.ID
+				}
+			} else {
+				if pkg.Name == cfg.Name && pkg.Version == cfg.Version && pkg.Release == cfg.Release {
+					fmt.Printf("\033[32mFound package:\033[0m %s (ID: %d) in channel %s\n", cfg.Name, pkg.ID, cfg.SourceChannel)
+					seek_pkg_id = pkg.ID
+				}
+			}
+
+			if seek_pkg_id != 0 {
+
+				found_pkgs, err := listProvidingChannels(client, sessionKey, seek_pkg_id)
 				if err != nil {
 					log.Printf("\033[31mFailed to list providing channels for package %d: %v\033[0m", pkg.ID, err)
 					continue
@@ -193,7 +216,7 @@ func handleAddPackages(config *Config, yamlFile string) {
 						}
 
 						if !pkg_already_in_target {
-							pkgIDs = append(pkgIDs, pkg.ID)
+							pkgIDs = append(pkgIDs, seek_pkg_id)
 							//fmt.Printf("\033[32mAdding package ID %d to the list for target channels\033[0m\n", pkg.ID)
 							if len(pkgIDs) > 0 {
 								fmt.Printf("\033[34mAdding package:\033[0m %s (IDs: %v) to target channel %s\n", cfg.Name, pkgIDs, targetChannel)
@@ -206,15 +229,10 @@ func handleAddPackages(config *Config, yamlFile string) {
 						}
 					}
 				}
-
 			}
 		}
-
-		/* if len(pkgIDs) == 0 {
-			log.Printf("\033[31mPackage not found:\033[0m %s in channel %s with version %s and release %s", cfg.Name, cfg.SourceChannel, cfg.Version, cfg.Release)
-			continue
-		} */
 	}
+	fmt.Printf("\033[32mSuccessfully processed %d packages from configuration file\033[0m\n", len(addPackagesConfig))
 }
 
 func handleListPackages(config *Config, channelLabel string) {
@@ -231,7 +249,7 @@ func handleListPackages(config *Config, channelLabel string) {
 	}
 	defer logoutFromSMLM(client, sessionKey)
 
-	packages, err := listPackagesInChannel(client, sessionKey, channelLabel)
+	packages, err := listPackagesInChannel(client, sessionKey, channelLabel, AddPackagesConfig{Newest: false})
 	if err != nil {
 		log.Fatalf("\033[31mfailed to list packages in channel\033[0m %s: %v", channelLabel, err)
 	}
